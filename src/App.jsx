@@ -44,7 +44,7 @@ function App() {
       formData.append("margin_mm", marginMm);
       formData.append("ignore_case", ignoreCase || false);
 
-      const res = await fetch("http://localhost:8000/remove-headers", {
+      const res = await fetch("https://pdf-header-api.onrender.com/remove-headers", {
         method: "POST",
         body: formData,
       });
@@ -194,7 +194,7 @@ function App() {
       </Content>
 
       <Footer className="app-footer">
-        <Text type="secondary">Local API: http://localhost:8000/remove-headers</Text>
+        ygz
       </Footer>
     </Layout>
   );
