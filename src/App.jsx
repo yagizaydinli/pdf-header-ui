@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Layout,
   Typography,
@@ -10,8 +10,17 @@ import {
   Checkbox,
   Button,
   message,
+  Divider,
+  Tooltip,
+  Splitter,
 } from "antd";
-import { InboxOutlined } from "@ant-design/icons";
+import {
+  InboxOutlined,
+  ScissorOutlined,
+  InfoCircleOutlined,
+  HeartFilled,
+  FilePdfOutlined,
+} from "@ant-design/icons";
 import "./App.css";
 
 const { Header, Content, Footer } = Layout;
@@ -20,7 +29,26 @@ const { Dragger } = Upload;
 
 function App() {
   const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null); // 🔹 PDF önizleme URL'si
   const [loading, setLoading] = useState(false);
+
+  // file değiştiğinde preview URL üret / temizle
+  useEffect(() => {
+    if (!file) {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [file]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFinish = async (values) => {
     const { headerTexts, bandMm, marginMm, ignoreCase } = values;
@@ -44,10 +72,13 @@ function App() {
       formData.append("margin_mm", marginMm);
       formData.append("ignore_case", ignoreCase || false);
 
-      const res = await fetch("https://pdf-header-api.onrender.com/remove-headers", {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch(
+        "https://pdf-header-api.onrender.com/remove-headers",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
       if (!res.ok) {
         let msg = "İstek başarısız.";
@@ -55,7 +86,7 @@ function App() {
           const data = await res.json();
           if (data?.error) msg = data.error;
         } catch {
-          // json parse olmazsa geç
+          // json okunamazsa boşver
         }
         throw new Error(msg);
       }
@@ -84,11 +115,11 @@ function App() {
     multiple: false,
     accept: "application/pdf",
     beforeUpload: (file) => {
-      setFile(file);
-      return false; // otomatik upload yapma
+      setFile(file);     // 🔹 state'e yaz
+      return false;      // otomatik upload yapma
     },
     onRemove: () => {
-      setFile(null);
+      setFile(null);     // 🔹 kaldırınca preview da temizlenecek
     },
     maxCount: 1,
     fileList: file ? [file] : [],
@@ -97,104 +128,189 @@ function App() {
   return (
     <Layout className="layout">
       <Header className="app-header">
-        <div className="logo">PDF Header Remover</div>
+        <div className="header-inner">
+          <div className="logo-mark">
+            <ScissorOutlined />
+          </div>
+          <div className="logo-text">
+            <span className="logo-title">PDF Header Remover</span>
+            <span className="logo-sub">clean up noisy exports in one click</span>
+          </div>
+        </div>
       </Header>
 
       <Content className="app-content">
-        <Card className="app-card" bordered>
-          <Title level={3} style={{ textAlign: "center", marginBottom: 8 }}>
-            PDF Header Temizleme Aracı
-          </Title>
-          <Text type="secondary" style={{ display: "block", textAlign: "center", marginBottom: 24 }}>
-            PDF yükle, üstteki header metinlerini kaldır ve yeni PDF&apos;i indir.
-          </Text>
-
-          <Form
-            layout="vertical"
-            onFinish={handleFinish}
-            initialValues={{
-              bandMm: 25,
-              marginMm: 0,
-              ignoreCase: false,
-            }}
+        <div className="content-shell">
+          <Splitter
+            className="content-splitter"
+            resizeTrigger={true}
+            min="25%"
+            max="65%"
+            defaultSize="40%"
           >
-            <Form.Item label="PDF Dosyası">
-              <Dragger {...uploadProps}>
-                <p className="ant-upload-drag-icon">
-                  <InboxOutlined />
-                </p>
-                <p className="ant-upload-text">
-                  PDF dosyasını buraya sürükle veya tıklayıp seç
-                </p>
-                <p className="ant-upload-hint">
-                  Sadece tek bir PDF dosyası yüklenebilir.
-                </p>
-              </Dragger>
-            </Form.Item>
+            {/* Sol panel: Form */}
+            <Splitter.Panel>
+              <div className="left-pane">
+                <Card className="app-card">
+                  <div className="card-header">
+                    <div className="card-title-area">
+                      <div>
+                        <span className="merve-text">
+                          Sadece Merve için geliştirilmiştir <HeartFilled />
+                        </span>
+                        <Title level={4} style={{ marginBottom: 2 }}>
+                          PDF Dosyasını Yükle ve Temizle
+                        </Title>
+                        <Text type="secondary">
+                          Üst bant yüksekliğini ve header metinlerini belirle
+                        </Text>
+                      </div>
+                    </div>
+                  </div>
 
-            <Form.Item
-              label={
-                <>
-                  Header Metinleri{" "}
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    (Her satıra bir metin yaz)
-                  </Text>
-                </>
-              }
-              name="headerTexts"
-              rules={[
-                { required: true, message: "Lütfen en az bir header metni gir." },
-              ]}
-            >
-              <Input.TextArea
-                rows={4}
-                placeholder={`Örnek:\nFirma Adı\nCONFIDENTIAL\nSayfa`}
-              />
-            </Form.Item>
+                  <Divider />
 
-            <div className="inline-row">
-              <Form.Item
-                label="Üst Bant (mm)"
-                name="bandMm"
-                className="inline-item"
-              >
-                <InputNumber min={5} max={120} style={{ width: "100%" }} />
-              </Form.Item>
+                  <Form
+                    layout="vertical"
+                    onFinish={handleFinish}
+                    initialValues={{
+                      bandMm: 25,
+                      marginMm: 0,
+                      ignoreCase: false,
+                    }}
+                  >
+                    <Form.Item label="PDF Dosyası">
+                      <Dragger {...uploadProps} className="upload-area">
+                        <p className="ant-upload-drag-icon">
+                          <InboxOutlined />
+                        </p>
+                        <p className="ant-upload-text">
+                          PDF dosyasını buraya sürükle veya tıklayıp seç
+                        </p>
+                        <p className="ant-upload-hint">
+                          Büyük dosyalar için işleme süresi birkaç saniye
+                          sürebilir.
+                        </p>
+                      </Dragger>
+                    </Form.Item>
 
-              <Form.Item
-                label="Sol/Sağ Margin (mm)"
-                name="marginMm"
-                className="inline-item"
-              >
-                <InputNumber min={0} max={40} style={{ width: "100%" }} />
-              </Form.Item>
-            </div>
+                    <Form.Item
+                      label={
+                        <div className="label-with-hint">
+                          <span>Header Metinleri</span>
+                          <Tooltip title="Her satıra PDF üzerinde aynen görünen bir metin yaz. Örn: firma adı, tarih, sayfa numarası cümlesi.">
+                            <InfoCircleOutlined className="label-icon" />
+                          </Tooltip>
+                        </div>
+                      }
+                      name="headerTexts"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Lütfen en az bir header metni gir.",
+                        },
+                      ]}
+                    >
+                      <Input.TextArea
+                        rows={4}
+                        placeholder={`Örnek:\nFirma Adı\nCONFIDENTIAL\nSayfa`}
+                      />
+                    </Form.Item>
 
-            <Form.Item
-              name="ignoreCase"
-              valuePropName="checked"
-              className="checkbox-item"
-            >
-              <Checkbox>Büyük/küçük harfe duyarsız ara</Checkbox>
-            </Form.Item>
+                    <div className="inline-row">
+                      <Form.Item
+                        label="Üst Bant (mm)"
+                        name="bandMm"
+                        className="inline-item"
+                      >
+                        <InputNumber
+                          min={5}
+                          max={120}
+                          style={{ width: "100%" }}
+                          addonAfter="mm"
+                        />
+                      </Form.Item>
 
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                block
-                size="large"
-                loading={loading}
-              >
-                {loading ? "İşleniyor..." : "Headerları Sil ve PDF İndir"}
-              </Button>
-            </Form.Item>
-          </Form>
-        </Card>
+                      <Form.Item
+                        label="Sol/Sağ Margin (mm)"
+                        name="marginMm"
+                        className="inline-item"
+                      >
+                        <InputNumber
+                          min={0}
+                          max={40}
+                          style={{ width: "100%" }}
+                          addonAfter="mm"
+                        />
+                      </Form.Item>
+                    </div>
+
+                    <Form.Item
+                      name="ignoreCase"
+                      valuePropName="checked"
+                      className="checkbox-item"
+                    >
+                      <Checkbox>Büyük/küçük harfe duyarsız ara</Checkbox>
+                    </Form.Item>
+
+                    <Form.Item>
+                      <Button
+                        type="primary"
+                        htmlType="submit"
+                        block
+                        size="large"
+                        loading={loading}
+                        icon={<ScissorOutlined />}
+                      >
+                        {loading ? "İşleniyor..." : "Headerları Sil ve PDF İndir"}
+                      </Button>
+                    </Form.Item>
+                  </Form>
+
+                  <div className="hint-box">
+                    <Text strong>İpucu:</Text>{" "}
+                    <Text type="secondary">
+                      Eğer bazı headerlar silinmiyorsa, tam metni PDF üzerinde
+                      göründüğü gibi (boşluklar ve noktalama dahil) yazmayı dene.
+                    </Text>
+                  </div>
+                </Card>
+              </div>
+            </Splitter.Panel>
+
+            {/* Sağ panel: Yüklenen PDF'in önizlemesi */}
+            <Splitter.Panel>
+              <div className="right-pane">
+                {previewUrl ? (
+                  <iframe
+                    title="PDF Önizleme"
+                    src={previewUrl}
+                    className="pdf-preview-frame"
+                  />
+                ) : (
+                  <div className="right-inner">
+                    <div className="preview-icon-wrap">
+                      <FilePdfOutlined className="preview-icon" />
+                    </div>
+                    <Title level={3} className="right-title">
+                      Yakında burada önizleme olacak
+                    </Title>
+                    <Text type="secondary" className="right-text">
+                      Henüz bir PDF seçmedin. PDF yüklediğinde sağ tarafta
+                      anında önizlemesini göreceksin.
+                    </Text>
+                  </div>
+                )}
+              </div>
+            </Splitter.Panel>
+          </Splitter>
+        </div>
       </Content>
 
       <Footer className="app-footer">
-        ygz
+        <Text type="secondary">
+          <span className="pill">ygz</span>
+        </Text>
       </Footer>
     </Layout>
   );
